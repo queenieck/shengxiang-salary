@@ -69,7 +69,7 @@
       <!-- 表單卡片區塊 -->
       <section class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4 space-y-4">
         <div class="flex items-center justify-between border-b border-zinc-100 pb-3">
-          <h2 class="text-base font-bold text-zinc-900">填寫每日工資</h2>
+          <h2 class="text-base font-bold text-zinc-900">填寫 / 修改每日工資</h2>
           <span id="rate-badge" class="text-xs font-semibold px-2 py-0.5 bg-zinc-100 text-zinc-700 rounded">級距: -</span>
         </div>
 
@@ -124,7 +124,7 @@
           </div>
 
           <button type="submit" class="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold h-12 rounded-lg text-sm transition-transform active:scale-[0.99]">
-            儲存並記憶紀錄
+            儲存並更新紀錄
           </button>
         </form>
       </section>
@@ -134,22 +134,23 @@
         <div class="p-4 border-b border-zinc-100 flex justify-between items-center">
           <div>
             <h2 class="text-base font-bold text-zinc-900">當月工資明細</h2>
-            <p class="text-xs text-zinc-500">左右滑動檢視完整表格</p>
+            <p class="text-xs text-zinc-500">點擊表格資料行即可快速載入修改</p>
           </div>
           <span id="current-period-tag" class="text-xs font-bold text-zinc-800 bg-zinc-100 px-2.5 py-1 rounded-full">115年09月</span>
         </div>
 
         <div class="table-container overflow-x-auto w-full">
-          <table class="w-full text-left border-collapse min-w-[550px]">
+          <table class="w-full text-left border-collapse min-w-[620px]">
             <thead>
               <tr class="bg-zinc-50 border-b border-zinc-200 text-xs text-zinc-600 font-bold">
                 <th class="py-2.5 px-3 text-center w-12">項次</th>
                 <th class="py-2.5 px-3 text-center w-20">日期</th>
-                <th class="py-2.5 px-3 w-32">工地名稱</th>
+                <th class="py-2.5 px-3 w-28">工地名稱</th>
                 <th class="py-2.5 px-3 text-center w-20">離場</th>
                 <th class="py-2.5 px-3 text-right w-20">薪資</th>
                 <th class="py-2.5 px-3 text-right w-20">合計</th>
                 <th class="py-2.5 px-3 w-28">備註</th>
+                <th class="py-2.5 px-3 text-center w-24">操作</th>
               </tr>
             </thead>
             <tbody id="table-body" class="divide-y divide-zinc-100 text-sm text-zinc-800">
@@ -427,7 +428,40 @@
       renderTable();
       updateSummary();
 
-      alert(`${empName} - ${year}年${month}月${day}日 紀錄已成功儲存！`);
+      alert(`${empName} - ${year}年${month}月${day}日 紀錄已更新完成！`);
+    }
+
+    function editRecord(day) {
+      document.getElementById('input-day').value = day;
+      const empName = document.getElementById('input-employee').value;
+      const year = parseInt(document.getElementById('input-year').value);
+      const month = parseInt(document.getElementById('input-month').value);
+      const dateKey = `${empName}-${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      
+      const item = records.find(r => r.dateKey === dateKey);
+      if (item) {
+        document.getElementById('input-site').value = item.site || 'F18P9';
+        document.getElementById('input-time').value = item.time || '19:00';
+        document.getElementById('input-note').value = item.note || '';
+      }
+      autoCalculateSalary();
+
+      // 滾動回到上方表單
+      document.getElementById('record-form').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function deleteRecord(day) {
+      if (!confirm(`確定要清除 ${day} 日的這筆紀錄嗎？`)) return;
+
+      const empName = document.getElementById('input-employee').value;
+      const year = parseInt(document.getElementById('input-year').value);
+      const month = parseInt(document.getElementById('input-month').value);
+      const dateKey = `${empName}-${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+      records = records.filter(r => r.dateKey !== dateKey);
+      saveRecordsToStorage();
+      renderTable();
+      updateSummary();
     }
 
     function renderTable() {
@@ -444,16 +478,24 @@
         const item = records.find(r => r.dateKey === dateKey) || { day: d, site: '', time: '', salary: 0, note: '' };
 
         const tr = document.createElement('tr');
-        tr.className = 'hover:bg-zinc-50 transition-colors border-b border-zinc-100';
+        tr.className = 'hover:bg-zinc-100 cursor-pointer transition-colors border-b border-zinc-100';
+
+        const hasData = item.salary > 0 || item.site || item.time;
 
         tr.innerHTML = `
-          <td class="py-2.5 px-3 text-center font-semibold text-zinc-500 text-xs">${d}</td>
-          <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs font-medium">${month}月${d}日</td>
-          <td class="py-2.5 px-3 whitespace-nowrap text-xs font-medium ${item.site ? 'text-zinc-900' : 'text-zinc-300'}">${item.site || '-'}</td>
-          <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs ${item.time ? 'text-zinc-800' : 'text-zinc-300'}">${item.time || '-'}</td>
-          <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs">${item.salary ? '$' + item.salary.toLocaleString() : '-'}</td>
-          <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs font-bold">${item.salary ? '$' + item.salary.toLocaleString() : '-'}</td>
-          <td class="py-2.5 px-3 text-xs text-zinc-500 whitespace-nowrap">${item.note || ''}</td>
+          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-center font-semibold text-zinc-500 text-xs">${d}</td>
+          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-center whitespace-nowrap text-xs font-medium">${month}月${d}日</td>
+          <td onclick="editRecord(${d})" class="py-2.5 px-3 whitespace-nowrap text-xs font-medium ${item.site ? 'text-zinc-900' : 'text-zinc-300'}">${item.site || '-'}</td>
+          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-center whitespace-nowrap text-xs ${item.time ? 'text-zinc-800' : 'text-zinc-300'}">${item.time || '-'}</td>
+          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-right whitespace-nowrap text-xs">${item.salary ? '$' + item.salary.toLocaleString() : '-'}</td>
+          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-right whitespace-nowrap text-xs font-bold">${item.salary ? '$' + item.salary.toLocaleString() : '-'}</td>
+          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-xs text-zinc-500 whitespace-nowrap">${item.note || ''}</td>
+          <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs">
+            ${hasData ? `
+              <button onclick="editRecord(${d})" class="text-blue-600 hover:text-blue-800 font-bold mr-2">編輯</button>
+              <button onclick="deleteRecord(${d})" class="text-red-500 hover:text-red-700 font-bold">清除</button>
+            ` : '-'}
+          </td>
         `;
         tbody.appendChild(tr);
       }
