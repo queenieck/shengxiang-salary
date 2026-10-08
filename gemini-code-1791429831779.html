@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>盛祥工程 - 工資紀錄系統</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS 匯出 Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .table-container::-webkit-scrollbar { height: 6px; }
+    .table-container::-webkit-scrollbar-thumb { background-color: #d4d4d8; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-zinc-100 text-zinc-900 min-h-screen pb-12 antialiased">
+
+  <!-- 1. 登入畫面 -->
+  <div id="login-section" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-md p-6 sm:p-8 w-full max-w-md space-y-6">
+      <div class="text-center space-y-1">
+        <h1 class="text-xl font-bold tracking-tight text-zinc-900">盛祥工程有限公司</h1>
+        <p class="text-xs text-zinc-500">工資紀錄系統 - 請登入系統</p>
+      </div>
+
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-700 mb-1">帳號 (身分證字號 / 管理者)</label>
+          <input type="text" id="login-id" placeholder="例如：B122136636 或 admin" required class="w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-700 mb-1">密碼 (西元生日 8 碼)</label>
+          <input type="password" id="login-pwd" placeholder="例如：19840306" required class="w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
+        </div>
+
+        <button type="submit" class="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold h-12 rounded-lg text-sm transition-transform active:scale-[0.99]">
+          登 入
+        </button>
+      </form>
+
+      <div class="border-t border-zinc-100 pt-3 text-center">
+        <p class="text-xs text-zinc-400">員工密碼預設為西元生日 (8位數字)</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 主系統畫面 -->
+  <div id="app-section" class="hidden">
+    <!-- 頂部導覽列 -->
+    <header class="bg-zinc-900 text-white sticky top-0 z-50 border-b border-zinc-800 shadow-sm">
+      <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+        <div>
+          <h1 class="text-base font-bold tracking-wide">盛祥工程有限公司</h1>
+          <p id="user-info-text" class="text-xs text-zinc-400">當前使用者：-</p>
+        </div>
+        <button onclick="handleLogout()" class="text-xs border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-md transition-colors">
+          安全登出
+        </button>
+      </div>
+    </header>
+
+    <main class="max-w-md mx-auto p-4 space-y-5">
+
+      <!-- 表單卡片區塊 -->
+      <section class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4 space-y-4">
+        <div class="flex items-center justify-between border-b border-zinc-100 pb-3">
+          <h2 class="text-base font-bold text-zinc-900">填寫每日工資</h2>
+          <span id="rate-badge" class="text-xs font-semibold px-2 py-0.5 bg-zinc-100 text-zinc-700 rounded">級距: -</span>
+        </div>
+
+        <form id="record-form" onsubmit="handleSaveRecord(event)" class="space-y-3.5">
+          
+          <!-- 員工選單 -->
+          <div id="employee-select-group">
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">員工姓名</label>
+            <select id="input-employee" onchange="onEmployeeChange()" class="w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
+            </select>
+          </div>
+
+          <!-- 動態日期選單 -->
+          <div>
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">日期 (自 2026 年起)</label>
+            <div class="grid grid-cols-3 gap-2">
+              <select id="input-year" onchange="updateDaysDropdown()" class="bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-2 focus:ring-2 focus:ring-zinc-800 focus:outline-none"></select>
+              <select id="input-month" onchange="updateDaysDropdown()" class="bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-2 focus:ring-2 focus:ring-zinc-800 focus:outline-none"></select>
+              <select id="input-day" class="bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-2 focus:ring-2 focus:ring-zinc-800 focus:outline-none"></select>
+            </div>
+          </div>
+
+          <!-- 工地名稱 -->
+          <div>
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">工地名稱</label>
+            <select id="input-site" class="w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
+              <option value="F18P9">F18P9</option>
+              <option value="F18P10">F18P10</option>
+              <option value="F22P4">F22P4</option>
+              <option value="F22P5">F22P5</option>
+              <option value="休息/未出勤">休息 / 未出勤</option>
+            </select>
+          </div>
+
+          <!-- 離場時間 / 出勤類型 & 自動計算薪資 -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-zinc-700 mb-1">離場時間 / 類型</label>
+              <select id="input-time" onchange="autoCalculateSalary()" class="w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-zinc-700 mb-1">自動計算薪資 ($)</label>
+              <input type="number" id="input-salary" placeholder="0" class="w-full bg-zinc-100 border border-zinc-300 text-zinc-900 font-bold text-sm rounded-lg h-11 px-3 focus:outline-none" readonly>
+            </div>
+          </div>
+
+          <!-- 備註 -->
+          <div>
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">備註 (選填)</label>
+            <input type="text" id="input-note" placeholder="例如：體檢藥檢六小時" class="w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
+          </div>
+
+          <button type="submit" class="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold h-12 rounded-lg text-sm transition-transform active:scale-[0.99]">
+            儲存並記憶紀錄
+          </button>
+        </form>
+      </section>
+
+      <!-- 當月明細表格 -->
+      <section class="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-zinc-100 flex justify-between items-center">
+          <div>
+            <h2 class="text-base font-bold text-zinc-900">當月工資明細</h2>
+            <p class="text-xs text-zinc-500">左右滑動檢視完整表格</p>
+          </div>
+          <span id="current-period-tag" class="text-xs font-bold text-zinc-800 bg-zinc-100 px-2.5 py-1 rounded-full">115年09月</span>
+        </div>
+
+        <div class="table-container overflow-x-auto w-full">
+          <table class="w-full text-left border-collapse min-w-[550px]">
+            <thead>
+              <tr class="bg-zinc-50 border-b border-zinc-200 text-xs text-zinc-600 font-bold">
+                <th class="py-2.5 px-3 text-center w-12">項次</th>
+                <th class="py-2.5 px-3 text-center w-20">日期</th>
+                <th class="py-2.5 px-3 w-32">工地名稱</th>
+                <th class="py-2.5 px-3 text-center w-20">離場</th>
+                <th class="py-2.5 px-3 text-right w-20">薪資</th>
+                <th class="py-2.5 px-3 text-right w-20">合計</th>
+                <th class="py-2.5 px-3 w-28">備註</th>
+              </tr>
+            </thead>
+            <tbody id="table-body" class="divide-y divide-zinc-100 text-sm text-zinc-800">
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 統計與匯出按鈕 -->
+      <section class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4 space-y-3">
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between text-zinc-600">
+            <span>當月工資總計：</span>
+            <span id="stat-subtotal" class="font-semibold text-zinc-900">$0</span>
+          </div>
+          <div class="border-t border-dashed border-zinc-200 pt-2 flex justify-between text-base font-bold text-zinc-900">
+            <span>應付總額：</span>
+            <span id="stat-total" class="text-zinc-900">$0</span>
+          </div>
+        </div>
+
+        <div id="admin-actions" class="pt-2 border-t border-zinc-100">
+          <button onclick="exportToExcel()" class="w-full border-2 border-zinc-900 hover:bg-zinc-900 hover:text-white text-zinc-900 font-bold h-12 rounded-lg text-sm transition-colors flex items-center justify-center space-x-2">
+            <span>匯出 Excel 薪資表 (.xlsx)</span>
+          </button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    // 管理者帳號設定
+    const ADMIN_ACCOUNT = { id: "admin", pwd: "admin123", name: "系統管理者" };
+
+    // 人員真實資料名單 (根據提供之照片資料)
+    const EMPLOYEES = [
+      { name: "吳睿鈞", rateKey: "2000/200", id: "D123677932", pwd: "19890917" },
+      { name: "徐朝恩", rateKey: "1800/150", id: "F128946167", pwd: "19930810" },
+      { name: "陳俊傑", rateKey: "2500/250", id: "F126215258", pwd: "19840903" },
+      { name: "黃丞伯", rateKey: "2800/300", id: "B121286557", pwd: "19760718" },
+      { name: "柯君翰", rateKey: "1800/150", id: "L125745457", pwd: "20011214" },
+      { name: "康家豪粉光", rateKey: "2500/250", id: "G121915503", pwd: "19880921" },
+      { name: "康家豪EPOXY", rateKey: "2800/300", id: "G121915503", pwd: "19880921" },
+      { name: "張天寶", rateKey: "2800/300", id: "L124326181", pwd: "19900612" },
+      { name: "陳見宜", rateKey: "2800/300", id: "N124693152", pwd: "19840915" },
+      { name: "陳培恩", rateKey: "2800/300", id: "R123538146", pwd: "19840708" },
+      { name: "謝佳龍", rateKey: "2800/300", id: "T123810163", pwd: "19891218" },
+      { name: "謝琮欽", rateKey: "2800/300", id: "L122627112", pwd: "19750820" },
+      { name: "曹益彰", rateKey: "2800/300", id: "N124631741", pwd: "19840519" },
+      { name: "吳玲姿", rateKey: "1800/200", id: "E221015179", pwd: "19710504" },
+      { name: "吳秋慧", rateKey: "1800/200", id: "M220785123", pwd: "19730917" },
+      { name: "吳明宸", rateKey: "1800/150", id: "H125986956", pwd: "20020530" },
+      { name: "劉世瑋", rateKey: "1800/150", id: "B122136636", pwd: "19840306" },
+      { name: "莊偉政", rateKey: "2800/300", id: "B121186847", pwd: "19750425" }
+    ];
+
+    // 薪資換算表
+    const SALARY_TABLES = {
+      "2800/300": { "半天": 1400, "一天": 2800, "19:00": 3100, "20:00": 3400, "21:00": 3700, "22:00": 4000, "23:00": 4300, "24:00": 4600, "01:00": 4900, "02:00": 5200, "03:00": 5500, "04:00": 5800, "05:00": 6100, "06:00": 6400, "07:00": 6700, "08:00": 7000, "09:00": 7300, "10:00": 7600, "11:00": 7900, "12:00": 8200, "13:00": 8500, "14:00": 8800, "15:00": 9100, "16:00": 9400, "17:00": 9700, "18:00": 10000 },
+      "2000/200": { "半天": 1000, "一天": 2000, "19:00": 2200, "20:00": 2400, "21:00": 2600, "22:00": 2800, "23:00": 3000, "24:00": 3200, "01:00": 3400, "02:00": 3600, "03:00": 3800, "04:00": 4000, "05:00": 4200, "06:00": 4400, "07:00": 4600, "08:00": 4800, "09:00": 5000, "10:00": 5200, "11:00": 5400, "12:00": 5600, "13:00": 5800, "14:00": 6000, "15:00": 6200, "16:00": 6400, "17:00": 6600, "18:00": 6800 },
+      "1800/200": { "半天": 900, "一天": 1800, "19:00": 2000, "20:00": 2200, "21:00": 2400, "22:00": 2600, "23:00": 2800, "24:00": 3000, "01:00": 3200, "02:00": 3400, "03:00": 3600, "04:00": 3800, "05:00": 4000, "06:00": 4200, "07:00": 4400, "08:00": 4600, "09:00": 4800, "10:00": 5000, "11:00": 5200, "12:00": 5400, "13:00": 5600, "14:00": 5800, "15:00": 6000, "16:00": 6200, "17:00": 6400, "18:00": 6600 },
+      "1800/150": { "半天": 900, "一天": 1800, "19:00": 1950, "20:00": 2100, "21:00": 2250, "22:00": 2400, "23:00": 2550, "24:00": 2700, "01:00": 2850, "02:00": 3000, "03:00": 3150, "04:00": 3300, "05:00": 3450, "06:00": 3600, "07:00": 3750, "08:00": 3900, "09:00": 4050, "10:00": 4200, "11:00": 4350, "12:00": 4500, "13:00": 4650, "14:00": 4800, "15:00": 4950, "16:00": 5100, "17:00": 5250, "18:00": 5400 },
+      "2500/250": { "半天": 1250, "一天": 2500, "19:00": 2750, "20:00": 3000, "21:00": 3250, "22:00": 3500, "23:00": 3750, "24:00": 4000, "01:00": 4250, "02:00": 4500, "03:00": 4750, "04:00": 5000, "05:00": 5250, "06:00": 5500, "07:00": 5750, "08:00": 6000, "09:00": 6250, "10:00": 6500, "11:00": 6750, "12:00": 7000, "13:00": 7250, "14:00": 7500, "15:00": 7750, "16:00": 8000, "17:00": 8250, "18:00": 8500 }
+    };
+
+    let currentUser = null;
+    let records = [];
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const inputId = document.getElementById('login-id').value.trim();
+      const inputPwd = document.getElementById('login-pwd').value.trim();
+
+      if (inputId === ADMIN_ACCOUNT.id && inputPwd === ADMIN_ACCOUNT.pwd) {
+        currentUser = { role: "admin", name: ADMIN_ACCOUNT.name };
+        enterApp();
+        return;
+      }
+
+      const emp = EMPLOYEES.find(e => e.id.toUpperCase() === inputId.toUpperCase() && e.pwd === inputPwd);
+      if (emp) {
+        currentUser = { role: "worker", name: emp.name, empData: emp };
+        enterApp();
+        return;
+      }
+
+      alert("帳號或密碼錯誤，請重新確認！\n(帳號為身分證，密碼為西元生日 8 碼)");
+    }
+
+    function handleLogout() {
+      currentUser = null;
+      document.getElementById('app-section').classList.add('hidden');
+      document.getElementById('login-section').classList.remove('hidden');
+      document.getElementById('login-id').value = '';
+      document.getElementById('login-pwd').value = '';
+    }
+
+    function enterApp() {
+      document.getElementById('login-section').classList.add('hidden');
+      document.getElementById('app-section').classList.remove('hidden');
+
+      initEmployeeDropdown();
+      initYearMonthDropdowns();
+      initTimeDropdown();
+      loadRecordsFromStorage();
+
+      if (currentUser.role === 'admin') {
+        document.getElementById('user-info-text').textContent = "當前使用者：管理者 (全權限)";
+        document.getElementById('input-employee').disabled = false;
+      } else {
+        document.getElementById('user-info-text').textContent = `當前使用者：${currentUser.name}`;
+        document.getElementById('input-employee').value = currentUser.name;
+        document.getElementById('input-employee').disabled = true;
+      }
+
+      onEmployeeChange();
+    }
+
+    function initEmployeeDropdown() {
+      const empSelect = document.getElementById('input-employee');
+      empSelect.innerHTML = '';
+      EMPLOYEES.forEach(emp => {
+        const opt = document.createElement('option');
+        opt.value = emp.name;
+        opt.textContent = `${emp.name} (${emp.rateKey})`;
+        empSelect.appendChild(opt);
+      });
+    }
+
+    function onEmployeeChange() {
+      const empName = document.getElementById('input-employee').value;
+      const emp = EMPLOYEES.find(e => e.name === empName) || EMPLOYEES[0];
+      document.getElementById('rate-badge').textContent = `級距: ${emp.rateKey}`;
+      autoCalculateSalary();
+      renderTable();
+      updateSummary();
+    }
+
+    function initYearMonthDropdowns() {
+      const yearSelect = document.getElementById('input-year');
+      const monthSelect = document.getElementById('input-month');
+      
+      const currentYear = new Date().getFullYear();
+      const startYear = 2026;
+      const maxYear = Math.max(startYear + 5, currentYear + 2);
+
+      yearSelect.innerHTML = '';
+      for (let y = startYear; y <= maxYear; y++) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        const rocYear = y - 1911;
+        opt.textContent = `${y}年 (${rocYear}年)`;
+        yearSelect.appendChild(opt);
+      }
+      yearSelect.value = "2026";
+
+      monthSelect.innerHTML = '';
+      for (let m = 1; m <= 12; m++) {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = `${m}月`;
+        monthSelect.appendChild(opt);
+      }
+      monthSelect.value = "9";
+
+      updateDaysDropdown();
+    }
+
+    function updateDaysDropdown() {
+      const year = parseInt(document.getElementById('input-year').value);
+      const month = parseInt(document.getElementById('input-month').value);
+      const daySelect = document.getElementById('input-day');
+      
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const currentSelectedDay = parseInt(daySelect.value) || 1;
+
+      daySelect.innerHTML = '';
+      for (let d = 1; d <= daysInMonth; d++) {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = `${d}日`;
+        daySelect.appendChild(opt);
+      }
+
+      daySelect.value = Math.min(currentSelectedDay, daysInMonth);
+      updatePeriodTag();
+      renderTable();
+      updateSummary();
+    }
+
+    function updatePeriodTag() {
+      const year = parseInt(document.getElementById('input-year').value);
+      const month = parseInt(document.getElementById('input-month').value);
+      const rocYear = year - 1911;
+      const monthStr = String(month).padStart(2, '0');
+      document.getElementById('current-period-tag').textContent = `${rocYear}年${monthStr}月`;
+    }
+
+    function initTimeDropdown() {
+      const timeSelect = document.getElementById('input-time');
+      timeSelect.innerHTML = '';
+      
+      const specialOpts = ["一天", "半天", "休息/未出勤"];
+      specialOpts.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o;
+        opt.textContent = o;
+        timeSelect.appendChild(opt);
+      });
+
+      const timeSlots = ["19:00","20:00","21:00","22:00","23:00","24:00","01:00","02:00","03:00","04:00","05:00","06:00","07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00"];
+      timeSlots.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        timeSelect.appendChild(opt);
+      });
+
+      timeSelect.value = "19:00";
+    }
+
+    function autoCalculateSalary() {
+      const empName = document.getElementById('input-employee').value;
+      const emp = EMPLOYEES.find(e => e.name === empName) || EMPLOYEES[0];
+      const selectedTime = document.getElementById('input-time').value;
+      const salaryInput = document.getElementById('input-salary');
+
+      if (selectedTime === "休息/未出勤") {
+        salaryInput.value = 0;
+        return;
+      }
+
+      const rateTable = SALARY_TABLES[emp.rateKey];
+      if (rateTable && rateTable[selectedTime] !== undefined) {
+        salaryInput.value = rateTable[selectedTime];
+      } else {
+        salaryInput.value = 0;
+      }
+    }
+
+    function loadRecordsFromStorage() {
+      const saved = localStorage.getItem('shengxiang_salary_records_v6');
+      if (saved) {
+        try { records = JSON.parse(saved); } catch (e) { records = []; }
+      }
+    }
+
+    function saveRecordsToStorage() {
+      localStorage.setItem('shengxiang_salary_records_v6', JSON.stringify(records));
+    }
+
+    function handleSaveRecord(e) {
+      e.preventDefault();
+      const empName = document.getElementById('input-employee').value;
+      const year = parseInt(document.getElementById('input-year').value);
+      const month = parseInt(document.getElementById('input-month').value);
+      const day = parseInt(document.getElementById('input-day').value);
+      const site = document.getElementById('input-site').value;
+      const time = document.getElementById('input-time').value;
+      const salary = parseInt(document.getElementById('input-salary').value) || 0;
+      const note = document.getElementById('input-note').value;
+
+      const dateKey = `${empName}-${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const index = records.findIndex(r => r.dateKey === dateKey);
+      const recordItem = { dateKey, empName, year, month, day, site: site === '休息/未出勤' ? '' : site, time, salary, note };
+
+      if (index !== -1) {
+        records[index] = recordItem;
+      } else {
+        records.push(recordItem);
+      }
+
+      saveRecordsToStorage();
+      renderTable();
+      updateSummary();
+
+      alert(`${empName} - ${year}年${month}月${day}日 紀錄已成功儲存！`);
+    }
+
+    function renderTable() {
+      const empName = document.getElementById('input-employee').value;
+      const year = parseInt(document.getElementById('input-year').value);
+      const month = parseInt(document.getElementById('input-month').value);
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+
+      const daysInMonth = new Date(year, month, 0).getDate();
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateKey = `${empName}-${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const item = records.find(r => r.dateKey === dateKey) || { day: d, site: '', time: '', salary: 0, note: '' };
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-zinc-50 transition-colors border-b border-zinc-100';
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 text-center font-semibold text-zinc-500 text-xs">${d}</td>
+          <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs font-medium">${month}月${d}日</td>
+          <td class="py-2.5 px-3 whitespace-nowrap text-xs font-medium ${item.site ? 'text-zinc-900' : 'text-zinc-300'}">${item.site || '-'}</td>
+          <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs ${item.time ? 'text-zinc-800' : 'text-zinc-300'}">${item.time || '-'}</td>
+          <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs">${item.salary ? '$' + item.salary.toLocaleString() : '-'}</td>
+          <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs font-bold">${item.salary ? '$' + item.salary.toLocaleString() : '-'}</td>
+          <td class="py-2.5 px-3 text-xs text-zinc-500 whitespace-nowrap">${item.note || ''}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function updateSummary() {
+      const empName = document.getElementById('input-employee').value;
+      const year = parseInt(document.getElementById('input-year').value);
+      const month = parseInt(document.getElementById('input-month').value);
+      
+      const currentMonthRecords = records.filter(r => r.empName === empName && r.year === year && r.month === month);
+      const subtotal = currentMonthRecords.reduce((sum, r) => sum + (parseInt(r.salary) || 0), 0);
+
+      document.getElementById('stat-subtotal').textContent = `$ ${subtotal.toLocaleString()}`;
+      document.getElementById('stat-total').textContent = `$ ${subtotal.toLocaleString()}`;
+    }
+
+    function exportToExcel() {
+      const empName = document.getElementById('input-employee').value;
+      const emp = EMPLOYEES.find(e => e.name === empName) || EMPLOYEES[0];
+      const year = parseInt(document.getElementById('input-year').value);
+      const month = parseInt(document.getElementById('input-month').value);
+      const rocYear = year - 1911;
+      const monthStr = String(month).padStart(2, '0');
+
+      const excelData = [
+        ["盛祥工程有限公司"],
+        [`姓名：${empName}`, "", `薪資表(一天${emp.rateKey})`, "", "", "", `${rocYear}年${monthStr}月`],
+        ["項次", "日期", "工地名稱", "離場時間", "薪資", "壓呎", "合計", "備註"]
+      ];
+
+      const daysInMonth = new Date(year, month, 0).getDate();
+      let subtotal = 0;
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateKey = `${empName}-${year}-${monthStr}-${String(d).padStart(2, '0')}`;
+        const r = records.find(item => item.dateKey === dateKey) || {};
+        const salaryVal = parseInt(r.salary) || 0;
+        subtotal += salaryVal;
+
+        excelData.push([
+          d,
+          `${month}月${d}日`,
+          r.site || "",
+          r.time || "",
+          salaryVal || "",
+          "",
+          salaryVal || "-",
+          r.note || ""
+        ]);
+      }
+
+      excelData.push(["", "", "", "總計", subtotal, "-", subtotal]);
+      excelData.push(["當月薪資計", "", "", "", "$", "", subtotal]);
+      excelData.push(["加數項目", "", "", "", "", "", ""]);
+      excelData.push(["扣款項目", "", "", "", "-$", "", "", ""]);
+      excelData.push(["應付總額", "", "", "", "$", "", subtotal]);
+      excelData.push(["簽收：", "", "戶名：謝佳蓉  帳戶：國泰世華銀行013 大里分行 258-50-635565-3"]);
+
+      const ws = XLSX.utils.aoa_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "薪資表");
+      XLSX.writeFile(wb, `盛祥工程_${empName}_薪資表_${rocYear}年${monthStr}月.xlsx`);
+    }
+  </script>
+</body>
+</html>
