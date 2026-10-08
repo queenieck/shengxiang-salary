@@ -104,7 +104,7 @@
             </select>
           </div>
 
-          <!-- 離場時間 / 出勤類型 & 薪資（自訂可填寫） -->
+          <!-- 離場時間 / 出勤類型 & 薪資（級距自動帶出，可手動改寫） -->
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-semibold text-zinc-700 mb-1">離場時間 / 類型</label>
@@ -112,7 +112,7 @@
               </select>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-zinc-700 mb-1">薪資 ($) <span class="text-zinc-400 font-normal">(可手動修改)</span></label>
+              <label class="block text-xs font-semibold text-zinc-700 mb-1">薪資 ($) <span class="text-zinc-400 font-normal">(級距自動試算/可自訂)</span></label>
               <input type="number" id="input-salary" placeholder="0" class="w-full bg-white border border-zinc-300 text-zinc-900 font-bold text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
             </div>
           </div>
@@ -120,7 +120,7 @@
           <!-- 備註 -->
           <div>
             <label class="block text-xs font-semibold text-zinc-700 mb-1">備註 (選填)</label>
-            <input type="text" id="input-note" placeholder="例如：跨夜連續工作至9/2 19:00下班" class="w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
+            <input type="text" id="input-note" placeholder="例如：體檢藥檢六小時 / 跨夜連續加班" class="w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
           </div>
 
           <button type="submit" class="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold h-12 rounded-lg text-sm transition-transform active:scale-[0.99]">
@@ -183,10 +183,10 @@
   </div>
 
   <script>
-    // 管理者帳號設定 (不於前端頁面上顯示)
+    // 管理者帳號設定
     const ADMIN_ACCOUNT = { id: "admin", pwd: "admin123", name: "系統管理者" };
 
-    // 人員真實資料名單
+    // 人員真實資料名單與級距
     const EMPLOYEES = [
       { name: "吳睿鈞", rateKey: "2000/200", id: "D123677932", pwd: "19890917" },
       { name: "徐朝恩", rateKey: "1800/150", id: "F128946167", pwd: "19930810" },
@@ -208,7 +208,7 @@
       { name: "莊偉政", rateKey: "2800/300", id: "B121186847", pwd: "19750425" }
     ];
 
-    // 薪資換算表
+    // 薪資級距換算表
     const SALARY_TABLES = {
       "2800/300": { "半天": 1400, "一天": 2800, "19:00": 3100, "20:00": 3400, "21:00": 3700, "22:00": 4000, "23:00": 4300, "24:00": 4600, "01:00": 4900, "02:00": 5200, "03:00": 5500, "04:00": 5800, "05:00": 6100, "06:00": 6400, "07:00": 6700, "08:00": 7000, "09:00": 7300, "10:00": 7600, "11:00": 7900, "12:00": 8200, "13:00": 8500, "14:00": 8800, "15:00": 9100, "16:00": 9400, "17:00": 9700, "18:00": 10000 },
       "2000/200": { "半天": 1000, "一天": 2000, "19:00": 2200, "20:00": 2400, "21:00": 2600, "22:00": 2800, "23:00": 3000, "24:00": 3200, "01:00": 3400, "02:00": 3600, "03:00": 3800, "04:00": 4000, "05:00": 4200, "06:00": 4400, "07:00": 4600, "08:00": 4800, "09:00": 5000, "10:00": 5200, "11:00": 5400, "12:00": 5600, "13:00": 5800, "14:00": 6000, "15:00": 6200, "16:00": 6400, "17:00": 6600, "18:00": 6800 },
@@ -373,6 +373,7 @@
       timeSelect.value = "19:00";
     }
 
+    // 依據級距自動帶出金額
     function autoCalculateSalary() {
       const empName = document.getElementById('input-employee').value;
       const emp = EMPLOYEES.find(e => e.name === empName) || EMPLOYEES[0];
