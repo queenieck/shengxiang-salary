@@ -104,7 +104,7 @@
             </select>
           </div>
 
-          <!-- 離場時間 / 出勤類型 & 自動計算薪資 -->
+          <!-- 離場時間 / 出勤類型 & 薪資（自訂可填寫） -->
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-semibold text-zinc-700 mb-1">離場時間 / 類型</label>
@@ -112,15 +112,15 @@
               </select>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-zinc-700 mb-1">自動計算薪資 ($)</label>
-              <input type="number" id="input-salary" placeholder="0" class="w-full bg-zinc-100 border border-zinc-300 text-zinc-900 font-bold text-sm rounded-lg h-11 px-3 focus:outline-none" readonly>
+              <label class="block text-xs font-semibold text-zinc-700 mb-1">薪資 ($) <span class="text-zinc-400 font-normal">(可手動修改)</span></label>
+              <input type="number" id="input-salary" placeholder="0" class="w-full bg-white border border-zinc-300 text-zinc-900 font-bold text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
             </div>
           </div>
 
           <!-- 備註 -->
           <div>
             <label class="block text-xs font-semibold text-zinc-700 mb-1">備註 (選填)</label>
-            <input type="text" id="input-note" placeholder="例如：體檢藥檢六小時" class="w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
+            <input type="text" id="input-note" placeholder="例如：跨夜連續工作至9/2 19:00下班" class="w-full bg-zinc-50 border border-zinc-300 text-zinc-900 text-sm rounded-lg h-11 px-3 focus:ring-2 focus:ring-zinc-800 focus:outline-none">
           </div>
 
           <button type="submit" class="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold h-12 rounded-lg text-sm transition-transform active:scale-[0.99]">
@@ -134,23 +134,23 @@
         <div class="p-4 border-b border-zinc-100 flex justify-between items-center">
           <div>
             <h2 class="text-base font-bold text-zinc-900">當月工資明細</h2>
-            <p class="text-xs text-zinc-500">點擊表格資料行即可快速載入修改</p>
+            <p class="text-xs text-zinc-500">左右滑動檢視完整表格與操作按鈕</p>
           </div>
           <span id="current-period-tag" class="text-xs font-bold text-zinc-800 bg-zinc-100 px-2.5 py-1 rounded-full">115年09月</span>
         </div>
 
         <div class="table-container overflow-x-auto w-full">
-          <table class="w-full text-left border-collapse min-w-[620px]">
+          <table class="w-full text-left border-collapse min-w-[650px]">
             <thead>
               <tr class="bg-zinc-50 border-b border-zinc-200 text-xs text-zinc-600 font-bold">
                 <th class="py-2.5 px-3 text-center w-12">項次</th>
                 <th class="py-2.5 px-3 text-center w-20">日期</th>
                 <th class="py-2.5 px-3 w-28">工地名稱</th>
-                <th class="py-2.5 px-3 text-center w-20">離場</th>
+                <th class="py-2.5 px-3 text-center w-24">離場</th>
                 <th class="py-2.5 px-3 text-right w-20">薪資</th>
                 <th class="py-2.5 px-3 text-right w-20">合計</th>
                 <th class="py-2.5 px-3 w-28">備註</th>
-                <th class="py-2.5 px-3 text-center w-24">操作</th>
+                <th class="py-2.5 px-3 text-center w-28">操作</th>
               </tr>
             </thead>
             <tbody id="table-body" class="divide-y divide-zinc-100 text-sm text-zinc-800">
@@ -416,7 +416,7 @@
 
       const dateKey = `${empName}-${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const index = records.findIndex(r => r.dateKey === dateKey);
-      const recordItem = { dateKey, empName, year, month, day, site: site === '休息/未出勤' ? '' : site, time, salary, note };
+      const recordItem = { dateKey, empName, year, month, day, site: site === '休息/未出勤' ? '' : site, time, salary, note, hasRecord: true };
 
       if (index !== -1) {
         records[index] = recordItem;
@@ -440,13 +440,14 @@
       
       const item = records.find(r => r.dateKey === dateKey);
       if (item) {
-        document.getElementById('input-site').value = item.site || 'F18P9';
+        document.getElementById('input-site').value = item.site || '休息/未出勤';
         document.getElementById('input-time').value = item.time || '19:00';
+        document.getElementById('input-salary').value = item.salary !== undefined ? item.salary : 0;
         document.getElementById('input-note').value = item.note || '';
+      } else {
+        autoCalculateSalary();
       }
-      autoCalculateSalary();
 
-      // 滾動回到上方表單
       document.getElementById('record-form').scrollIntoView({ behavior: 'smooth' });
     }
 
@@ -475,28 +476,37 @@
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dateKey = `${empName}-${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const item = records.find(r => r.dateKey === dateKey) || { day: d, site: '', time: '', salary: 0, note: '' };
+        const item = records.find(r => r.dateKey === dateKey);
 
         const tr = document.createElement('tr');
-        tr.className = 'hover:bg-zinc-100 cursor-pointer transition-colors border-b border-zinc-100';
+        tr.className = 'hover:bg-zinc-100 transition-colors border-b border-zinc-100';
 
-        const hasData = item.salary > 0 || item.site || item.time;
-
-        tr.innerHTML = `
-          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-center font-semibold text-zinc-500 text-xs">${d}</td>
-          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-center whitespace-nowrap text-xs font-medium">${month}月${d}日</td>
-          <td onclick="editRecord(${d})" class="py-2.5 px-3 whitespace-nowrap text-xs font-medium ${item.site ? 'text-zinc-900' : 'text-zinc-300'}">${item.site || '-'}</td>
-          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-center whitespace-nowrap text-xs ${item.time ? 'text-zinc-800' : 'text-zinc-300'}">${item.time || '-'}</td>
-          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-right whitespace-nowrap text-xs">${item.salary ? '$' + item.salary.toLocaleString() : '-'}</td>
-          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-right whitespace-nowrap text-xs font-bold">${item.salary ? '$' + item.salary.toLocaleString() : '-'}</td>
-          <td onclick="editRecord(${d})" class="py-2.5 px-3 text-xs text-zinc-500 whitespace-nowrap">${item.note || ''}</td>
-          <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs">
-            ${hasData ? `
-              <button onclick="editRecord(${d})" class="text-blue-600 hover:text-blue-800 font-bold mr-2">編輯</button>
-              <button onclick="deleteRecord(${d})" class="text-red-500 hover:text-red-700 font-bold">清除</button>
-            ` : '-'}
-          </td>
-        `;
+        if (item && item.hasRecord) {
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 text-center font-semibold text-zinc-500 text-xs">${d}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs font-medium">${month}月${d}日</td>
+            <td class="py-2.5 px-3 whitespace-nowrap text-xs font-medium ${item.site ? 'text-zinc-900' : 'text-zinc-300'}">${item.site || '-'}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs ${item.time ? 'text-zinc-800' : 'text-zinc-300'}">${item.time || '-'}</td>
+            <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs font-bold text-zinc-900">${item.salary !== undefined ? '$' + item.salary.toLocaleString() : '-'}</td>
+            <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs font-bold">${item.salary !== undefined ? '$' + item.salary.toLocaleString() : '-'}</td>
+            <td class="py-2.5 px-3 text-xs text-zinc-500 whitespace-nowrap">${item.note || ''}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs">
+              <button onclick="editRecord(${d})" class="bg-zinc-800 text-white hover:bg-zinc-700 px-2 py-1 rounded text-xs font-medium mr-1">編輯</button>
+              <button onclick="deleteRecord(${d})" class="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 px-2 py-1 rounded text-xs font-medium">清除</button>
+            </td>
+          `;
+        } else {
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 text-center font-semibold text-zinc-400 text-xs">${d}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs text-zinc-400">${month}月${d}日</td>
+            <td class="py-2.5 px-3 whitespace-nowrap text-xs text-zinc-300">-</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs text-zinc-300">-</td>
+            <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs text-zinc-300">-</td>
+            <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs text-zinc-300">-</td>
+            <td class="py-2.5 px-3 text-xs text-zinc-300 whitespace-nowrap"></td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap text-xs text-zinc-300">-</td>
+          `;
+        }
         tbody.appendChild(tr);
       }
     }
@@ -533,7 +543,7 @@
       for (let d = 1; d <= daysInMonth; d++) {
         const dateKey = `${empName}-${year}-${monthStr}-${String(d).padStart(2, '0')}`;
         const r = records.find(item => item.dateKey === dateKey) || {};
-        const salaryVal = parseInt(r.salary) || 0;
+        const salaryVal = r.salary !== undefined ? parseInt(r.salary) : 0;
         subtotal += salaryVal;
 
         excelData.push([
